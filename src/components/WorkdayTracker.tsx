@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, Plus } from 'lucide-react';
+import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, Plus, Calendar, History } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkSession } from '@/hooks/useWorkSession';
@@ -541,6 +541,73 @@ const WorkdayTracker = () => {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Work History Section */}
+          {entries.length > 0 && (
+            <Card className="shadow-lg border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl text-card-foreground flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  Recent Work History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {entries.slice(0, 5).map((entry) => {
+                    const entryDate = new Date(entry.date);
+                    const isToday = entryDate.toDateString() === new Date().toDateString();
+                    const isYesterday = entryDate.toDateString() === 
+                      new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
+                    
+                    let dateLabel = entryDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric'
+                    });
+                    
+                    if (isToday) dateLabel = "Today";
+                    else if (isYesterday) dateLabel = "Yesterday";
+
+                    return (
+                      <div key={entry.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">
+                            {entry.name || `Session ${dateLabel}`}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {dateLabel} • {new Date(entry.check_in).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            })}
+                            {entry.check_out && ` - ${new Date(entry.check_out).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit', 
+                              hour12: false
+                            })}`}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-semibold text-sm">
+                            {formatDuration(entry.total_worked_ms)}
+                          </div>
+                          {entry.total_paused_ms > 0 && (
+                            <div className="text-xs text-orange-600">
+                              {formatDuration(entry.total_paused_ms)} paused
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {entries.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Showing last 5 sessions • {entries.length - 5} more in history
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     );
