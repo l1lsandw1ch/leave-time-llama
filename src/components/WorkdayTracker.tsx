@@ -588,7 +588,7 @@ const WorkdayTracker = () => {
                         </div>
                         <div className="text-right">
                           <div className="font-mono font-semibold text-sm">
-                            {formatDuration(entry.total_worked_ms)}
+                            {formatDuration(Math.max(0, entry.total_worked_ms - entry.total_paused_ms))}
                           </div>
                         </div>
                       </div>
