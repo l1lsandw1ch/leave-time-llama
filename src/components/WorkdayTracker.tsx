@@ -168,17 +168,18 @@ const WorkdayTracker = () => {
       totalWorkedMs += currentTime.getTime() - timer.currentSessionStart.getTime();
     }
     
-    // Add current pause time if timer is paused
+    // Add current pause time if timer is paused (real-time update)
     if (timer.isPaused && timer.pauseStartTime) {
       totalPausedMs += currentTime.getTime() - timer.pauseStartTime.getTime();
     }
 
     const remainingMs = Math.max(0, requiredMs - totalWorkedMs);
     
-    // Calculate leave time including all paused time
-    const adjustedLeaveTime = timer.isRunning ? 
-      new Date(currentTime.getTime() + remainingMs) : 
-      new Date(arrivalMs + requiredMs + totalPausedMs);
+    // Calculate base leave time (arrival + required work)
+    const baseLeaveTime = new Date(arrivalMs + requiredMs);
+    
+    // Add all paused time to the leave time
+    const adjustedLeaveTime = new Date(baseLeaveTime.getTime() + totalPausedMs);
 
     return {
       totalWorkedMs,
@@ -186,7 +187,7 @@ const WorkdayTracker = () => {
       remainingMs,
       requiredMs,
       leaveTime: adjustedLeaveTime,
-      originalLeaveTime: new Date(arrivalMs + requiredMs),
+      originalLeaveTime: baseLeaveTime,
       progressPercentage: Math.min(100, (totalWorkedMs / requiredMs) * 100),
       isComplete: totalWorkedMs >= requiredMs
     };
