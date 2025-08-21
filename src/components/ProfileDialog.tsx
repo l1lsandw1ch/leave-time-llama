@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera, Save, Lock } from 'lucide-react';
@@ -22,15 +22,27 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
     await uploadAvatar(file);
     setIsUploading(false);
+    // Reset the input value to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCameraClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileInputRef.current?.click();
   };
 
   const handleUpdateProfile = async () => {
@@ -61,13 +73,16 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Profile Settings</DialogTitle>
+          <DialogDescription>
+            Manage your profile information and account settings.
+          </DialogDescription>
         </DialogHeader>
         
         <Tabs defaultValue="profile" className="w-full">
@@ -95,8 +110,9 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
                       size="sm"
                       variant="outline"
                       className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={handleCameraClick}
                       disabled={isUploading}
+                      type="button"
                     >
                       <Camera className="h-4 w-4" />
                     </Button>
