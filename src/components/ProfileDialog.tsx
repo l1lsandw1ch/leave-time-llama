@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useProfile } from '@/hooks/useProfile';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ interface ProfileDialogProps {
 
 export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   const { profile, updateProfile, uploadAvatar, changePassword } = useProfile();
+  const { user } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -159,6 +161,17 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Enter your display name"
+                  />
+                </div>
+
+                {/* Email Address - Read Only */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
 
