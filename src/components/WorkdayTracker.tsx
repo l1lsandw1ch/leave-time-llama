@@ -179,13 +179,25 @@ const WorkdayTracker = () => {
     const now = new Date();
     const arrivalTimeString = `${arrivalTime.hours.padStart(2, '0')}:${arrivalTime.minutes.padStart(2, '0')}`;
     
-    // Create work session - timer starts from NOW, not arrival time
+    // Calculate arrival time for today
+    const arrivalToday = new Date();
+    arrivalToday.setHours(parseInt(arrivalTime.hours), parseInt(arrivalTime.minutes), 0, 0);
+    
+    // If arrival time is in the future (next day scenario), assume it was yesterday
+    if (arrivalToday > now) {
+      arrivalToday.setDate(arrivalToday.getDate() - 1);
+    }
+    
+    // Calculate time already worked since arrival
+    const alreadyWorkedMs = Math.max(0, now.getTime() - arrivalToday.getTime());
+    
+    // Create work session
     const session = await createSession(
       arrivalTimeString,
       parseInt(requiredWorkTime.hours),
       parseInt(requiredWorkTime.minutes)
     );
-    
+
     if (!session) {
       toast({
         title: "Error",
@@ -195,12 +207,18 @@ const WorkdayTracker = () => {
       return;
     }
 
-    // Create time entry starting from now
+    // Update session with already worked time
+    await updateSession({
+      total_worked_ms: alreadyWorkedMs,
+      current_session_start: now.toISOString(),
+    });
+
+    // Create time entry with arrival time as check-in
     const entry = await createEntry({
       session_id: session.id,
-      date: now.toISOString(),
-      check_in: now.toISOString(), // Check in at current time
-      total_worked_ms: 0, // Start with 0 worked time
+      date: arrivalToday.toISOString(),
+      check_in: arrivalToday.toISOString(), // Check in at arrival time
+      total_worked_ms: alreadyWorkedMs, // Start with already worked time
       total_paused_ms: 0,
       status: 'active'
     });
