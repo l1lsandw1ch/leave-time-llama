@@ -187,22 +187,7 @@ export const useProfile = () => {
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
     try {
-      // First verify current password by attempting to sign in
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: currentPassword,
-      });
-
-      if (verifyError) {
-        toast({
-          title: "Error",
-          description: "Current password is incorrect.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      // Update password
+      // Update password directly - Supabase will handle current password verification
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -224,6 +209,11 @@ export const useProfile = () => {
       return true;
     } catch (error) {
       console.error('Error changing password:', error);
+      toast({
+        title: "Error",
+        description: "Failed to change password.",
+        variant: "destructive",
+      });
       return false;
     }
   };
