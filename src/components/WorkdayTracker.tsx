@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle } from 'lucide-react';
+import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CookieConsent from './CookieConsent';
 import TimeTable, { TimeEntry } from './TimeTable';
@@ -29,6 +29,7 @@ const WorkdayTracker = () => {
   const [requiredWorkTime, setRequiredWorkTime] = useState<TimeInput>({ hours: '8', minutes: '0' });
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [manualPauseTime, setManualPauseTime] = useState<TimeInput>({ hours: '0', minutes: '0' });
   
   const [timer, setTimer] = useState<TimerState>({
     isRunning: false,
@@ -160,10 +161,16 @@ const WorkdayTracker = () => {
     const requiredMs = (parseInt(requiredWorkTime.hours) * 60 + parseInt(requiredWorkTime.minutes)) * 60 * 1000;
     
     let totalWorkedMs = timer.totalWorkedMs;
+    let totalPausedMs = timer.totalPausedMs;
     
     // Add current session time if timer is running
     if (timer.isRunning && timer.currentSessionStart) {
       totalWorkedMs += currentTime.getTime() - timer.currentSessionStart.getTime();
+    }
+    
+    // Add current pause time if timer is paused
+    if (timer.isPaused && timer.pauseStartTime) {
+      totalPausedMs += currentTime.getTime() - timer.pauseStartTime.getTime();
     }
 
     const remainingMs = Math.max(0, requiredMs - totalWorkedMs);
@@ -176,6 +183,7 @@ const WorkdayTracker = () => {
 
     return {
       totalWorkedMs,
+      totalPausedMs,
       remainingMs,
       requiredMs,
       leaveTime: adjustedLeaveTime,
@@ -436,6 +444,42 @@ const WorkdayTracker = () => {
     });
   };
 
+  const addManualPauseTime = () => {
+    const additionalPauseMs = (parseInt(manualPauseTime.hours) * 60 + parseInt(manualPauseTime.minutes)) * 60 * 1000;
+    
+    if (additionalPauseMs <= 0) {
+      toast({
+        title: "Invalid Time",
+        description: "Please enter a valid pause duration.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setTimer(prev => {
+      const newTotalPaused = prev.totalPausedMs + additionalPauseMs;
+      
+      // Update time entry with additional pause time
+      if (currentEntryId.current) {
+        updateTimeEntry({ 
+          totalPaused: newTotalPaused
+        });
+      }
+      
+      return {
+        ...prev,
+        totalPausedMs: newTotalPaused,
+      };
+    });
+    
+    setManualPauseTime({ hours: '0', minutes: '0' });
+    
+    toast({
+      title: "Pause Time Added",
+      description: `Added ${formatDuration(additionalPauseMs)} to pause time.`,
+    });
+  };
+
   const stats = calculateCurrentStats();
 
   // Update current entry in real-time
@@ -673,6 +717,61 @@ const WorkdayTracker = () => {
                 </div>
                 <div className="text-sm text-muted-foreground mt-2">
                   {stats.isComplete ? 'You can leave anytime!' : 'Until you can leave'}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pause Time */}
+            <Card className="shadow-lg">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Pause className="h-5 w-5 text-orange-500" />
+                  Pause Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-mono font-bold text-orange-600">
+                  {formatDuration(stats.totalPausedMs)}
+                </div>
+                <div className="text-sm text-muted-foreground mt-2">
+                  {timer.isPaused ? 'Currently paused' : 'Total paused today'}
+                </div>
+                
+                {/* Manual Pause Time Addition */}
+                <div className="mt-4 space-y-3">
+                  <Label className="text-sm font-medium">Add forgotten pause time:</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Hours</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={manualPauseTime.hours}
+                        onChange={(e) => setManualPauseTime(prev => ({ ...prev, hours: formatTimeInput(e.target.value, 'hours') }))}
+                        className="text-center font-mono text-sm h-8"
+                      />
+                    </div>
+                    <span className="text-lg font-mono mb-1">:</span>
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Minutes</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={manualPauseTime.minutes}
+                        onChange={(e) => setManualPauseTime(prev => ({ ...prev, minutes: formatTimeInput(e.target.value, 'minutes') }))}
+                        className="text-center font-mono text-sm h-8"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={addManualPauseTime}
+                      className="h-8 px-3"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
