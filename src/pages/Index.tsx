@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
+
 import WorkdayTracker from '@/components/WorkdayTracker';
+import { BurgerMenu } from '@/components/BurgerMenu';
 
 const Index = () => {
   const { user, loading, signOut } = useAuth();
@@ -29,10 +30,8 @@ const Index = () => {
   return (
     <div>
       <div className="flex justify-between items-center p-4 border-b">
-        <h1 className="text-xl font-semibold">Welcome back!</h1>
-        <Button variant="outline" onClick={signOut}>
-          Sign Out
-        </Button>
+        <h1 className="text-xl font-semibold">Workday Tracker</h1>
+        <BurgerMenu />
       </div>
       <WorkdayTracker />
     </div>
