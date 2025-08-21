@@ -84,9 +84,40 @@ export const useProfile = () => {
   };
 
   const updateProfile = async (updates: { display_name?: string; avatar_url?: string }) => {
-    if (!user || !profile) return null;
+    if (!user) return null;
 
     try {
+      // If no profile exists, create one first
+      if (!profile) {
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            display_name: updates.display_name || user.email?.split('@')[0] || 'User',
+            avatar_url: updates.avatar_url || null,
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          toast({
+            title: "Error",
+            description: "Failed to create profile.",
+            variant: "destructive",
+          });
+          return null;
+        }
+
+        setProfile(newProfile);
+        toast({
+          title: "Success",
+          description: "Profile created successfully.",
+        });
+        return newProfile;
+      }
+
+      // Update existing profile
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -112,6 +143,11 @@ export const useProfile = () => {
       return data;
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to update profile.",
+        variant: "destructive",
+      });
       return null;
     }
   };
