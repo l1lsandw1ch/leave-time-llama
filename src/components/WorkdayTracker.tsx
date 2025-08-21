@@ -699,7 +699,7 @@ const WorkdayTracker = () => {
                   {formatDuration(stats.totalWorkedMs)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-2">
-                  {stats.progressPercentage.toFixed(1)}% complete
+                  {stats.progressPercentage.toFixed(1)}% complete (breaks excluded)
                 </div>
                 <div className="w-full bg-secondary h-3 rounded-full mt-3 overflow-hidden">
                   <div 
