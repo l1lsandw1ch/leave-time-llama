@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import CookieConsent from './CookieConsent';
-import TimeTable, { TimeEntry } from './TimeTable';
+import { useAuth } from '@/hooks/useAuth';
+import { useWorkSession } from '@/hooks/useWorkSession';
+import { useWorkEntries, type WorkEntry } from '@/hooks/useWorkEntries';
+import TimeTable, { type TimeEntry } from './TimeTable';
 import DailySummary from './DailySummary';
 
 interface TimeInput {
@@ -25,33 +27,15 @@ interface TimerState {
 }
 
 const WorkdayTracker = () => {
-  const [hasConsent, setHasConsent] = useState(false);
+  const { user } = useAuth();
+  const { currentSession, loading: sessionLoading, createSession, updateSession, completeSession } = useWorkSession();
+  const { entries, loading: entriesLoading, createEntry, updateEntry, deleteEntry, renameEntry } = useWorkEntries();
+  
   const [arrivalTime, setArrivalTime] = useState<TimeInput>({ hours: '', minutes: '' });
   const [requiredWorkTime, setRequiredWorkTime] = useState<TimeInput>({ hours: '8', minutes: '0' });
-  const [isSetupComplete, setIsSetupComplete] = useState(false);
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [manualPauseTime, setManualPauseTime] = useState<TimeInput>({ hours: '0', minutes: '0' });
-  
-  const [timer, setTimer] = useState<TimerState>({
-    isRunning: false,
-    isPaused: false,
-    startTime: null,
-    totalWorkedMs: 0,
-    totalPausedMs: 0,
-    currentSessionStart: null,
-    pauseStartTime: null,
-  });
-  
   const [currentTime, setCurrentTime] = useState(new Date());
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentEntryId = useRef<string | null>(null);
-
-  // Load saved data on consent
-  useEffect(() => {
-    if (hasConsent) {
-      loadSavedData();
-    }
-  }, [hasConsent]);
 
   // Update current time every second
   useEffect(() => {
@@ -61,92 +45,49 @@ const WorkdayTracker = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Save data when timer state changes
+  // Initialize arrival time from current session
   useEffect(() => {
-    if (hasConsent && isSetupComplete) {
-      saveData();
+    if (currentSession) {
+      const time = currentSession.arrival_time.split(':');
+      setArrivalTime({ hours: time[0], minutes: time[1] });
+      setRequiredWorkTime({ 
+        hours: currentSession.required_work_hours.toString(), 
+        minutes: currentSession.required_work_minutes.toString().padStart(2, '0')
+      });
     }
-  }, [timer, arrivalTime, requiredWorkTime, isSetupComplete, hasConsent]);
+  }, [currentSession]);
 
-  const loadSavedData = () => {
-    try {
-      const consent = localStorage.getItem('workday-tracker-consent');
-      if (consent !== 'accepted') return;
-
-      const savedData = localStorage.getItem('workday-tracker-data');
-      const savedEntries = localStorage.getItem('workday-tracker-entries');
-      
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        setArrivalTime(data.arrivalTime || { hours: '', minutes: '' });
-        setRequiredWorkTime(data.requiredWorkTime || { hours: '8', minutes: '0' });
-        setIsSetupComplete(data.isSetupComplete || false);
-        
-        if (data.timer) {
-          const timerData = data.timer;
-          // Restore timer state, but recalculate currentSessionStart if it was running
-          setTimer({
-            ...timerData,
-            startTime: timerData.startTime ? new Date(timerData.startTime) : null,
-            currentSessionStart: timerData.isRunning && timerData.currentSessionStart ? 
-              new Date(timerData.currentSessionStart) : null,
-          });
-          currentEntryId.current = data.currentEntryId || null;
-        }
-      }
-
-      if (savedEntries) {
-        setTimeEntries(JSON.parse(savedEntries));
-      }
-    } catch (error) {
-      console.error('Failed to load saved data:', error);
-    }
-  };
-
-  const saveData = () => {
-    try {
-      const consent = localStorage.getItem('workday-tracker-consent');
-      if (consent !== 'accepted') return;
-
-      const dataToSave = {
-        arrivalTime,
-        requiredWorkTime,
-        isSetupComplete,
-        timer,
-        currentEntryId: currentEntryId.current,
+  // Get current timer state from session
+  const getTimerState = (): TimerState => {
+    if (!currentSession) {
+      return {
+        isRunning: false,
+        isPaused: false,
+        startTime: null,
+        totalWorkedMs: 0,
+        totalPausedMs: 0,
+        currentSessionStart: null,
+        pauseStartTime: null,
       };
-      
-      localStorage.setItem('workday-tracker-data', JSON.stringify(dataToSave));
-      localStorage.setItem('workday-tracker-entries', JSON.stringify(timeEntries));
-    } catch (error) {
-      console.error('Failed to save data:', error);
     }
+
+    return {
+      isRunning: currentSession.is_running,
+      isPaused: currentSession.is_paused,
+      startTime: currentSession.start_time ? new Date(currentSession.start_time) : null,
+      totalWorkedMs: currentSession.total_worked_ms,
+      totalPausedMs: currentSession.total_paused_ms,
+      currentSessionStart: currentSession.current_session_start ? new Date(currentSession.current_session_start) : null,
+      pauseStartTime: currentSession.pause_start_time ? new Date(currentSession.pause_start_time) : null,
+    };
   };
 
-  const updateTimeEntry = (entryData: Partial<TimeEntry>) => {
-    setTimeEntries(prev => {
-      const existing = prev.find(entry => entry.id === currentEntryId.current);
-      if (existing) {
-        return prev.map(entry => 
-          entry.id === currentEntryId.current 
-            ? { ...entry, ...entryData }
-            : entry
-        );
-      } else if (currentEntryId.current) {
-        const newEntry: TimeEntry = {
-          id: currentEntryId.current,
-          date: new Date().toISOString(),
-          checkIn: new Date().toISOString(),
-          checkOut: null,
-          totalWorked: 0,
-          totalPaused: 0,
-          status: 'active',
-          ...entryData
-        };
-        return [...prev, newEntry];
-      }
-      return prev;
-    });
+  const timer = getTimerState();
+  const isSetupComplete = !!currentSession;
+
+  const updateCurrentEntry = async (entryData: Partial<WorkEntry>) => {
+    if (!currentEntryId.current) return;
+    await updateEntry(currentEntryId.current, entryData);
   };
 
   // Calculate real-time values
@@ -214,7 +155,7 @@ const WorkdayTracker = () => {
     }
   };
 
-  const startSetup = () => {
+  const startSetup = async () => {
     if (!arrivalTime.hours || !arrivalTime.minutes || !requiredWorkTime.hours) {
       toast({
         title: "Missing Information",
@@ -235,34 +176,42 @@ const WorkdayTracker = () => {
     }
     
     const alreadyWorkedMs = Math.max(0, now.getTime() - arrivalToday.getTime());
+    const arrivalTimeString = `${arrivalTime.hours.padStart(2, '0')}:${arrivalTime.minutes.padStart(2, '0')}`;
     
-    // Create new time entry
-    const entryId = `entry-${Date.now()}`;
-    currentEntryId.current = entryId;
+    // Create work session
+    const session = await createSession(
+      arrivalTimeString,
+      parseInt(requiredWorkTime.hours),
+      parseInt(requiredWorkTime.minutes)
+    );
     
-    // Set up timer with already worked time and start it running
-    setTimer({
-      isRunning: true,
-      isPaused: false,
-      startTime: arrivalToday,
-      totalWorkedMs: alreadyWorkedMs,
-      totalPausedMs: 0,
-      currentSessionStart: now,
-      pauseStartTime: null,
+    if (!session) {
+      toast({
+        title: "Error",
+        description: "Failed to create work session.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update session with already worked time
+    await updateSession({
+      total_worked_ms: alreadyWorkedMs,
+      current_session_start: now.toISOString(),
     });
     
     // Create time entry
-    updateTimeEntry({
-      id: entryId,
+    const entry = await createEntry({
+      session_id: session.id,
       date: arrivalToday.toISOString(),
-      checkIn: arrivalToday.toISOString(),
-      checkOut: null,
-      totalWorked: alreadyWorkedMs,
-      totalPaused: 0,
+      check_in: arrivalToday.toISOString(),
+      total_worked_ms: alreadyWorkedMs,
       status: 'active'
     });
     
-    setIsSetupComplete(true);
+    if (entry) {
+      currentEntryId.current = entry.id;
+    }
     
     const alreadyWorkedHours = Math.floor(alreadyWorkedMs / (1000 * 60 * 60));
     const alreadyWorkedMinutes = Math.floor((alreadyWorkedMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -273,19 +222,20 @@ const WorkdayTracker = () => {
     });
   };
 
-  const startTimer = () => {
+  const startTimer = async () => {
+    if (!currentSession) return;
+    
     const now = new Date();
-    setTimer(prev => ({
-      ...prev,
-      isRunning: true,
-      isPaused: false,
-      currentSessionStart: now,
-      startTime: prev.startTime || now,
-    }));
+    await updateSession({
+      is_running: true,
+      is_paused: false,
+      current_session_start: now.toISOString(),
+      start_time: currentSession.start_time || now.toISOString(),
+    });
     
     // Update time entry status
     if (currentEntryId.current) {
-      updateTimeEntry({ status: 'active' });
+      await updateCurrentEntry({ status: 'active' });
     }
     
     toast({
@@ -294,65 +244,60 @@ const WorkdayTracker = () => {
     });
   };
 
-  const pauseTimer = () => {
+  const pauseTimer = async () => {
+    if (!currentSession) return;
+    
     const now = new Date();
-    setTimer(prev => {
-      const sessionTime = prev.currentSessionStart ? 
-        now.getTime() - prev.currentSessionStart.getTime() : 0;
-      
-      const newTotalWorked = prev.totalWorkedMs + sessionTime;
-      
-      // Update time entry
-      if (currentEntryId.current) {
-        updateTimeEntry({ 
-          totalWorked: newTotalWorked,
-          status: 'paused'
-        });
-      }
-      
-      return {
-        ...prev,
-        isRunning: false,
-        isPaused: true,
-        totalWorkedMs: newTotalWorked,
-        currentSessionStart: null,
-        pauseStartTime: now,
-      };
+    const sessionTime = currentSession.current_session_start ? 
+      now.getTime() - new Date(currentSession.current_session_start).getTime() : 0;
+    
+    const newTotalWorked = currentSession.total_worked_ms + sessionTime;
+    
+    await updateSession({
+      is_running: false,
+      is_paused: true,
+      total_worked_ms: newTotalWorked,
+      current_session_start: null,
+      pause_start_time: now.toISOString(),
     });
+    
+    // Update time entry
+    if (currentEntryId.current) {
+      await updateCurrentEntry({ 
+        total_worked_ms: newTotalWorked,
+        status: 'paused'
+      });
+    }
+    
     toast({
       title: "Timer Paused",
       description: "Work session paused. You can resume anytime.",
     });
   };
 
-  const resumeTimer = () => {
+  const resumeTimer = async () => {
+    if (!currentSession) return;
+    
     const now = new Date();
-    setTimer(prev => {
-      // Add pause time to total paused time
-      const pauseTime = prev.pauseStartTime ? 
-        now.getTime() - prev.pauseStartTime.getTime() : 0;
-      
-      // Update time entry with pause time
-      if (currentEntryId.current) {
-        updateTimeEntry({ 
-          totalPaused: prev.totalPausedMs + pauseTime,
-          status: 'active'
-        });
-      }
-      
-      return {
-        ...prev,
-        isRunning: true,
-        isPaused: false,
-        totalPausedMs: prev.totalPausedMs + pauseTime,
-        currentSessionStart: now,
-        pauseStartTime: null,
-      };
+    const pauseTime = currentSession.pause_start_time ? 
+      now.getTime() - new Date(currentSession.pause_start_time).getTime() : 0;
+    
+    const newTotalPaused = currentSession.total_paused_ms + pauseTime;
+    
+    await updateSession({
+      is_running: true,
+      is_paused: false,
+      total_paused_ms: newTotalPaused,
+      current_session_start: now.toISOString(),
+      pause_start_time: null,
     });
     
-    // Update time entry status
+    // Update time entry with pause time
     if (currentEntryId.current) {
-      updateTimeEntry({ status: 'active' });
+      await updateCurrentEntry({ 
+        total_paused_ms: newTotalPaused,
+        status: 'active'
+      });
     }
     
     toast({
@@ -361,7 +306,9 @@ const WorkdayTracker = () => {
     });
   };
 
-  const completeWorkday = () => {
+  const completeWorkday = async () => {
+    if (!currentSession) return;
+    
     // Mark current entry as completed
     if (currentEntryId.current) {
       const now = new Date();
@@ -369,24 +316,15 @@ const WorkdayTracker = () => {
         now.getTime() - timer.currentSessionStart.getTime() : 0;
       const totalWorked = timer.totalWorkedMs + sessionTime;
       
-      updateTimeEntry({ 
-        checkOut: now.toISOString(),
-        totalWorked,
+      await updateCurrentEntry({ 
+        check_out: now.toISOString(),
+        total_worked_ms: totalWorked,
         status: 'completed'
       });
     }
     
-    // Reset timer
-    setTimer({
-      isRunning: false,
-      isPaused: false,
-      startTime: null,
-      totalWorkedMs: 0,
-      totalPausedMs: 0,
-      currentSessionStart: null,
-      pauseStartTime: null,
-    });
-    setIsSetupComplete(false);
+    // Complete session
+    await completeSession();
     currentEntryId.current = null;
     
     toast({
@@ -395,26 +333,15 @@ const WorkdayTracker = () => {
     });
   };
 
-  const resetAll = () => {
+  const resetAll = async () => {
     // Complete current session if exists
-    if (currentEntryId.current) {
-      completeWorkday();
-    } else {
-      setTimer({
-        isRunning: false,
-        isPaused: false,
-        startTime: null,
-        totalWorkedMs: 0,
-        totalPausedMs: 0,
-        currentSessionStart: null,
-        pauseStartTime: null,
-      });
-      setIsSetupComplete(false);
-      currentEntryId.current = null;
+    if (currentSession) {
+      await completeWorkday();
     }
     
     setArrivalTime({ hours: '', minutes: '' });
     setRequiredWorkTime({ hours: '8', minutes: '0' });
+    currentEntryId.current = null;
     
     toast({
       title: "Reset Complete",
@@ -422,30 +349,28 @@ const WorkdayTracker = () => {
     });
   };
 
-  const renameEntry = (entryId: string, newName: string) => {
-    setTimeEntries(prev => 
-      prev.map(entry => 
-        entry.id === entryId 
-          ? { ...entry, name: newName }
-          : entry
-      )
-    );
+  const handleRenameEntry = async (entryId: string, newName: string) => {
+    await renameEntry(entryId, newName);
     toast({
       title: "Entry Renamed",
       description: "Work session name updated successfully.",
     });
   };
 
-  const deleteEntry = (entryId: string) => {
-    setTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
-    toast({
-      title: "Entry Deleted",
-      description: "Work session removed from history.",
-      variant: "destructive",
-    });
+  const handleDeleteEntry = async (entryId: string) => {
+    const success = await deleteEntry(entryId);
+    if (success) {
+      toast({
+        title: "Entry Deleted",
+        description: "Work session removed from history.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const addManualPauseTime = () => {
+  const addManualPauseTime = async () => {
+    if (!currentSession) return;
+    
     const additionalPauseMs = (parseInt(manualPauseTime.hours) * 60 + parseInt(manualPauseTime.minutes)) * 60 * 1000;
     
     if (additionalPauseMs <= 0) {
@@ -457,21 +382,18 @@ const WorkdayTracker = () => {
       return;
     }
     
-    setTimer(prev => {
-      const newTotalPaused = prev.totalPausedMs + additionalPauseMs;
-      
-      // Update time entry with additional pause time
-      if (currentEntryId.current) {
-        updateTimeEntry({ 
-          totalPaused: newTotalPaused
-        });
-      }
-      
-      return {
-        ...prev,
-        totalPausedMs: newTotalPaused,
-      };
+    const newTotalPaused = currentSession.total_paused_ms + additionalPauseMs;
+    
+    await updateSession({
+      total_paused_ms: newTotalPaused,
     });
+    
+    // Update time entry with additional pause time
+    if (currentEntryId.current) {
+      await updateCurrentEntry({ 
+        total_paused_ms: newTotalPaused
+      });
+    }
     
     setManualPauseTime({ hours: '0', minutes: '0' });
     
@@ -485,16 +407,21 @@ const WorkdayTracker = () => {
 
   // Update current entry in real-time
   useEffect(() => {
-    if (timer.isRunning && currentEntryId.current && stats) {
-      updateTimeEntry({ 
-        totalWorked: stats.totalWorkedMs,
+    if (timer.isRunning && currentEntryId.current && stats && currentSession) {
+      updateCurrentEntry({ 
+        total_worked_ms: stats.totalWorkedMs,
         status: stats.isComplete ? 'completed' : 'active'
       });
     }
   }, [stats?.totalWorkedMs, stats?.isComplete, timer.isRunning]);
 
-  if (!hasConsent) {
-    return <CookieConsent onAccept={() => setHasConsent(true)} />;
+  // Show loading state
+  if (sessionLoading || entriesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
   }
 
   if (!isSetupComplete) {
@@ -801,13 +728,13 @@ const WorkdayTracker = () => {
         )}
 
         {/* Daily Summary */}
-        <DailySummary entries={timeEntries} />
+        <DailySummary entries={entries} />
 
         {/* Work History */}
         <TimeTable 
-          entries={timeEntries} 
-          onRename={renameEntry}
-          onDelete={deleteEntry}
+          entries={entries} 
+          onRename={handleRenameEntry}
+          onDelete={handleDeleteEntry}
         />
 
         {/* Status Indicator */}

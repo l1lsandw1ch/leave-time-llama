@@ -9,11 +9,11 @@ export interface TimeEntry {
   id: string;
   name?: string; // Optional custom name for the entry
   date: string;
-  checkIn: string;
-  checkOut: string | null;
-  totalWorked: number; // in milliseconds
-  totalPaused: number; // in milliseconds
-  status: 'active' | 'completed' | 'paused';
+  check_in: string;
+  check_out: string | null;
+  total_worked_ms: number; // in milliseconds
+  total_paused_ms: number; // in milliseconds
+  status: string;
 }
 
 interface TimeTableProps {
@@ -88,7 +88,7 @@ const TimeTable = ({ entries, onRename, onDelete }: TimeTableProps) => {
 
   const totalWorkedToday = entries
     .filter(entry => new Date(entry.date).toDateString() === new Date().toDateString())
-    .reduce((sum, entry) => sum + entry.totalWorked, 0);
+    .reduce((sum, entry) => sum + entry.total_worked_ms, 0);
 
   if (entries.length === 0) {
     return (
@@ -172,16 +172,16 @@ const TimeTable = ({ entries, onRename, onDelete }: TimeTableProps) => {
                       )}
                     </TableCell>
                     <TableCell className="font-mono">
-                      {formatTime(entry.checkIn)}
+                      {formatTime(entry.check_in)}
                     </TableCell>
                     <TableCell className="font-mono">
-                      {entry.checkOut ? formatTime(entry.checkOut) : '-'}
+                      {entry.check_out ? formatTime(entry.check_out) : '-'}
                     </TableCell>
                     <TableCell className="font-mono font-semibold">
-                      {formatDuration(entry.totalWorked)}
+                      {formatDuration(entry.total_worked_ms)}
                     </TableCell>
                     <TableCell className="font-mono text-orange-600">
-                      {formatDuration(entry.totalPaused)}
+                      {formatDuration(entry.total_paused_ms)}
                     </TableCell>
                     <TableCell>
                       <span className={getStatusBadge(entry.status)}>

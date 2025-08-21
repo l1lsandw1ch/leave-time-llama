@@ -34,8 +34,8 @@ const DailySummary = ({ entries }: DailySummaryProps) => {
         sessions: 0
       };
     }
-    acc[dateKey].totalWorked += entry.totalWorked;
-    acc[dateKey].totalPaused += entry.totalPaused;
+    acc[dateKey].totalWorked += entry.total_worked_ms;
+    acc[dateKey].totalPaused += entry.total_paused_ms;
     acc[dateKey].sessions += 1;
     return acc;
   }, {} as Record<string, {
