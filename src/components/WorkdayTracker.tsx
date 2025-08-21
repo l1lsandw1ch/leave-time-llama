@@ -590,11 +590,6 @@ const WorkdayTracker = () => {
                           <div className="font-mono font-semibold text-sm">
                             {formatDuration(entry.total_worked_ms)}
                           </div>
-                          {entry.total_paused_ms > 0 && (
-                            <div className="text-xs text-orange-600">
-                              {formatDuration(entry.total_paused_ms)} paused
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
