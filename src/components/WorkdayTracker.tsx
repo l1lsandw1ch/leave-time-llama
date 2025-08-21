@@ -123,23 +123,20 @@ const WorkdayTracker = () => {
     
     const requiredMs = (currentSession.required_work_hours * 60 + currentSession.required_work_minutes) * 60 * 1000;
     
-    // Calculate total time that should have been worked since arrival
+    // Calculate time worked since arrival (this is what the user wants to see)
     const timeSinceArrivalMs = now.getTime() - arrivalToday.getTime();
     
-    // Get session totals
-    let totalWorkedMs = timer.totalWorkedMs;
+    // Time worked = time since arrival minus any paused time
     let totalPausedMs = timer.totalPausedMs;
     
-    // Add current session time if timer is running
-    if (timer.isRunning && timer.currentSessionStart) {
-      totalWorkedMs += now.getTime() - timer.currentSessionStart.getTime();
-    }
-    
-    // Add current pause time if timer is paused (real-time update)
+    // Add current pause time if timer is paused
     if (timer.isPaused && timer.pauseStartTime) {
       totalPausedMs += now.getTime() - timer.pauseStartTime.getTime();
     }
-
+    
+    // Total worked time = time since arrival minus paused time
+    const totalWorkedMs = Math.max(0, timeSinceArrivalMs - totalPausedMs);
+    
     const remainingMs = Math.max(0, requiredMs - totalWorkedMs);
     
     // Calculate leave time: arrival + required work + total paused time
