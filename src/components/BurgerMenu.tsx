@@ -57,7 +57,10 @@ export const BurgerMenu = () => {
             <Button
               variant="ghost"
               className="w-full justify-start h-12 text-left"
-              onClick={() => setIsOpen(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Keep the sheet open while profile dialog is active
+              }}
             >
               <User className="mr-3 h-5 w-5" />
               Profile Settings
