@@ -14,7 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      work_entries: {
+        Row: {
+          check_in: string
+          check_out: string | null
+          created_at: string
+          date: string
+          id: string
+          name: string | null
+          session_id: string
+          status: string
+          total_paused_ms: number
+          total_worked_ms: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          check_in: string
+          check_out?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          name?: string | null
+          session_id: string
+          status: string
+          total_paused_ms?: number
+          total_worked_ms?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          check_in?: string
+          check_out?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          name?: string | null
+          session_id?: string
+          status?: string
+          total_paused_ms?: number
+          total_worked_ms?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "work_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_sessions: {
+        Row: {
+          arrival_time: string
+          created_at: string
+          current_session_start: string | null
+          date: string
+          id: string
+          is_active: boolean
+          is_paused: boolean
+          is_running: boolean
+          pause_start_time: string | null
+          required_work_hours: number
+          required_work_minutes: number
+          start_time: string | null
+          total_paused_ms: number
+          total_worked_ms: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          arrival_time: string
+          created_at?: string
+          current_session_start?: string | null
+          date: string
+          id?: string
+          is_active?: boolean
+          is_paused?: boolean
+          is_running?: boolean
+          pause_start_time?: string | null
+          required_work_hours?: number
+          required_work_minutes?: number
+          start_time?: string | null
+          total_paused_ms?: number
+          total_worked_ms?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          arrival_time?: string
+          created_at?: string
+          current_session_start?: string | null
+          date?: string
+          id?: string
+          is_active?: boolean
+          is_paused?: boolean
+          is_running?: boolean
+          pause_start_time?: string | null
+          required_work_hours?: number
+          required_work_minutes?: number
+          start_time?: string | null
+          total_paused_ms?: number
+          total_worked_ms?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
