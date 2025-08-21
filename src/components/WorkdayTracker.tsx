@@ -163,10 +163,6 @@ const WorkdayTracker = () => {
     let totalWorkedMs = timer.totalWorkedMs;
     let totalPausedMs = timer.totalPausedMs;
     
-    // Add manual pause time
-    const manualPauseMs = (parseInt(manualPauseTime.hours) * 60 + parseInt(manualPauseTime.minutes)) * 60 * 1000;
-    totalPausedMs += manualPauseMs;
-    
     // Add current session time if timer is running
     if (timer.isRunning && timer.currentSessionStart) {
       totalWorkedMs += currentTime.getTime() - timer.currentSessionStart.getTime();
