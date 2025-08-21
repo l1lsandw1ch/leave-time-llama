@@ -45,7 +45,7 @@ const WorkdayTracker = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize arrival time from current session
+  // Initialize arrival time from current session and find current entry
   useEffect(() => {
     if (currentSession) {
       const time = currentSession.arrival_time.split(':');
@@ -54,8 +54,20 @@ const WorkdayTracker = () => {
         hours: currentSession.required_work_hours.toString(), 
         minutes: currentSession.required_work_minutes.toString().padStart(2, '0')
       });
+
+      // Find the current active entry for this session
+      if (!currentEntryId.current && entries.length > 0) {
+        const activeEntry = entries.find(entry => 
+          entry.session_id === currentSession.id && 
+          (entry.status === 'active' || entry.status === 'paused')
+        );
+        if (activeEntry) {
+          currentEntryId.current = activeEntry.id;
+          console.log('Found active entry:', activeEntry.id);
+        }
+      }
     }
-  }, [currentSession]);
+  }, [currentSession, entries]);
 
   // Get current timer state from session
   const getTimerState = (): TimerState => {
@@ -92,15 +104,25 @@ const WorkdayTracker = () => {
 
   // Calculate real-time values
   const calculateCurrentStats = () => {
-    if (!isSetupComplete) return null;
+    if (!isSetupComplete || !currentSession) return null;
 
-    const arrivalMs = new Date().setHours(
-      parseInt(arrivalTime.hours), 
-      parseInt(arrivalTime.minutes), 
-      0, 
-      0
-    );
-    const requiredMs = (parseInt(requiredWorkTime.hours) * 60 + parseInt(requiredWorkTime.minutes)) * 60 * 1000;
+    // Use session data for calculations
+    const sessionArrivalTime = currentSession.arrival_time.split(':');
+    const arrivalHours = parseInt(sessionArrivalTime[0]);
+    const arrivalMinutes = parseInt(sessionArrivalTime[1]);
+    
+    console.log('Session data:', {
+      arrivalTime: currentSession.arrival_time,
+      requiredHours: currentSession.required_work_hours,
+      requiredMinutes: currentSession.required_work_minutes,
+      totalWorkedMs: currentSession.total_worked_ms,
+      totalPausedMs: currentSession.total_paused_ms,
+      isRunning: currentSession.is_running,
+      currentSessionStart: currentSession.current_session_start
+    });
+    
+    const arrivalMs = new Date().setHours(arrivalHours, arrivalMinutes, 0, 0);
+    const requiredMs = (currentSession.required_work_hours * 60 + currentSession.required_work_minutes) * 60 * 1000;
     
     let totalWorkedMs = timer.totalWorkedMs;
     let totalPausedMs = timer.totalPausedMs;
@@ -122,6 +144,15 @@ const WorkdayTracker = () => {
     
     // Add all paused time to the leave time
     const adjustedLeaveTime = new Date(baseLeaveTime.getTime() + totalPausedMs);
+
+    console.log('Calculated stats:', {
+      totalWorkedMs,
+      totalPausedMs,
+      remainingMs,
+      requiredMs,
+      progressPercentage: Math.min(100, (totalWorkedMs / requiredMs) * 100),
+      isComplete: totalWorkedMs >= requiredMs
+    });
 
     return {
       totalWorkedMs,
