@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ interface ProfileDialogProps {
 
 export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   const { profile, updateProfile, uploadAvatar, changePassword } = useProfile();
-  const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [displayName, setDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,6 +24,13 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update displayName when profile changes
+  useEffect(() => {
+    if (profile?.display_name) {
+      setDisplayName(profile.display_name);
+    }
+  }, [profile]);
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     event.stopPropagation();
@@ -46,9 +53,18 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
   };
 
   const handleUpdateProfile = async () => {
+    if (!displayName.trim()) {
+      return;
+    }
+    
     setIsUpdating(true);
-    await updateProfile({ display_name: displayName });
+    const result = await updateProfile({ display_name: displayName.trim() });
     setIsUpdating(false);
+    
+    if (result) {
+      // Close dialog on successful update
+      setIsOpen(false);
+    }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -64,6 +80,8 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      // Close dialog on successful password change
+      setIsOpen(false);
     }
     setIsChangingPassword(false);
   };
@@ -146,7 +164,7 @@ export const ProfileDialog = ({ children }: ProfileDialogProps) => {
 
                 <Button 
                   onClick={handleUpdateProfile} 
-                  disabled={isUpdating}
+                  disabled={isUpdating || !displayName.trim()}
                   className="w-full"
                 >
                   <Save className="mr-2 h-4 w-4" />
