@@ -354,19 +354,15 @@ const WorkdayTracker = () => {
     });
   };
 
-  const resetAll = async () => {
-    // Complete current session if exists
-    if (currentSession) {
-      await completeWorkday();
-    }
+  const checkOut = async () => {
+    if (!currentSession) return;
     
-    setArrivalTime({ hours: '', minutes: '' });
-    setRequiredWorkTime({ hours: '8', minutes: '0' });
-    currentEntryId.current = null;
+    // Complete the workday
+    await completeWorkday();
     
     toast({
-      title: "Reset Complete",
-      description: "You can start a fresh workday.",
+      title: "Checked Out!",
+      description: "Have a great rest of your day!",
     });
   };
 
@@ -597,13 +593,13 @@ const WorkdayTracker = () => {
               )}
               
               <Button
-                onClick={resetAll}
+                onClick={checkOut}
                 size="lg"
                 variant="outline"
                 className="h-16 px-8"
               >
                 <RotateCcw className="mr-2 h-6 w-6" />
-                Reset All
+                Check Out
               </Button>
             </div>
           </CardContent>
