@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle } from 'lucide-react';
+import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, History } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import CookieConsent from './CookieConsent';
+import TimeTable, { TimeEntry } from './TimeTable';
 
 interface TimeInput {
   hours: string;
@@ -20,9 +22,12 @@ interface TimerState {
 }
 
 const WorkdayTracker = () => {
+  const [hasConsent, setHasConsent] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [arrivalTime, setArrivalTime] = useState<TimeInput>({ hours: '', minutes: '' });
   const [requiredWorkTime, setRequiredWorkTime] = useState<TimeInput>({ hours: '8', minutes: '0' });
   const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   
   const [timer, setTimer] = useState<TimerState>({
     isRunning: false,
@@ -34,6 +39,14 @@ const WorkdayTracker = () => {
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentEntryId = useRef<string | null>(null);
+
+  // Load saved data on consent
+  useEffect(() => {
+    if (hasConsent) {
+      loadSavedData();
+    }
+  }, [hasConsent]);
 
   // Update current time every second
   useEffect(() => {
@@ -42,6 +55,93 @@ const WorkdayTracker = () => {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Save data when timer state changes
+  useEffect(() => {
+    if (hasConsent && isSetupComplete) {
+      saveData();
+    }
+  }, [timer, arrivalTime, requiredWorkTime, isSetupComplete, hasConsent]);
+
+  const loadSavedData = () => {
+    try {
+      const consent = localStorage.getItem('workday-tracker-consent');
+      if (consent !== 'accepted') return;
+
+      const savedData = localStorage.getItem('workday-tracker-data');
+      const savedEntries = localStorage.getItem('workday-tracker-entries');
+      
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        setArrivalTime(data.arrivalTime || { hours: '', minutes: '' });
+        setRequiredWorkTime(data.requiredWorkTime || { hours: '8', minutes: '0' });
+        setIsSetupComplete(data.isSetupComplete || false);
+        
+        if (data.timer) {
+          const timerData = data.timer;
+          // Restore timer state, but recalculate currentSessionStart if it was running
+          setTimer({
+            ...timerData,
+            startTime: timerData.startTime ? new Date(timerData.startTime) : null,
+            currentSessionStart: timerData.isRunning && timerData.currentSessionStart ? 
+              new Date(timerData.currentSessionStart) : null,
+          });
+          currentEntryId.current = data.currentEntryId || null;
+        }
+      }
+
+      if (savedEntries) {
+        setTimeEntries(JSON.parse(savedEntries));
+      }
+    } catch (error) {
+      console.error('Failed to load saved data:', error);
+    }
+  };
+
+  const saveData = () => {
+    try {
+      const consent = localStorage.getItem('workday-tracker-consent');
+      if (consent !== 'accepted') return;
+
+      const dataToSave = {
+        arrivalTime,
+        requiredWorkTime,
+        isSetupComplete,
+        timer,
+        currentEntryId: currentEntryId.current,
+      };
+      
+      localStorage.setItem('workday-tracker-data', JSON.stringify(dataToSave));
+      localStorage.setItem('workday-tracker-entries', JSON.stringify(timeEntries));
+    } catch (error) {
+      console.error('Failed to save data:', error);
+    }
+  };
+
+  const updateTimeEntry = (entryData: Partial<TimeEntry>) => {
+    setTimeEntries(prev => {
+      const existing = prev.find(entry => entry.id === currentEntryId.current);
+      if (existing) {
+        return prev.map(entry => 
+          entry.id === currentEntryId.current 
+            ? { ...entry, ...entryData }
+            : entry
+        );
+      } else if (currentEntryId.current) {
+        const newEntry: TimeEntry = {
+          id: currentEntryId.current,
+          date: new Date().toISOString(),
+          checkIn: new Date().toISOString(),
+          checkOut: null,
+          totalWorked: 0,
+          status: 'active',
+          ...entryData
+        };
+        return [...prev, newEntry];
+      }
+      return prev;
+    });
+  };
 
   // Calculate real-time values
   const calculateCurrentStats = () => {
@@ -123,6 +223,10 @@ const WorkdayTracker = () => {
     
     const alreadyWorkedMs = Math.max(0, now.getTime() - arrivalToday.getTime());
     
+    // Create new time entry
+    const entryId = `entry-${Date.now()}`;
+    currentEntryId.current = entryId;
+    
     // Set up timer with already worked time and start it running
     setTimer({
       isRunning: true,
@@ -130,6 +234,16 @@ const WorkdayTracker = () => {
       startTime: arrivalToday,
       totalWorkedMs: alreadyWorkedMs,
       currentSessionStart: now,
+    });
+    
+    // Create time entry
+    updateTimeEntry({
+      id: entryId,
+      date: arrivalToday.toISOString(),
+      checkIn: arrivalToday.toISOString(),
+      checkOut: null,
+      totalWorked: alreadyWorkedMs,
+      status: 'active'
     });
     
     setIsSetupComplete(true);
@@ -152,6 +266,12 @@ const WorkdayTracker = () => {
       currentSessionStart: now,
       startTime: prev.startTime || now,
     }));
+    
+    // Update time entry status
+    if (currentEntryId.current) {
+      updateTimeEntry({ status: 'active' });
+    }
+    
     toast({
       title: "Timer Started",
       description: "Work session is now active.",
@@ -163,11 +283,21 @@ const WorkdayTracker = () => {
       const sessionTime = prev.currentSessionStart ? 
         currentTime.getTime() - prev.currentSessionStart.getTime() : 0;
       
+      const newTotalWorked = prev.totalWorkedMs + sessionTime;
+      
+      // Update time entry
+      if (currentEntryId.current) {
+        updateTimeEntry({ 
+          totalWorked: newTotalWorked,
+          status: 'paused'
+        });
+      }
+      
       return {
         ...prev,
         isRunning: false,
         isPaused: true,
-        totalWorkedMs: prev.totalWorkedMs + sessionTime,
+        totalWorkedMs: newTotalWorked,
         currentSessionStart: null,
       };
     });
@@ -185,13 +315,34 @@ const WorkdayTracker = () => {
       isPaused: false,
       currentSessionStart: now,
     }));
+    
+    // Update time entry status
+    if (currentEntryId.current) {
+      updateTimeEntry({ status: 'active' });
+    }
+    
     toast({
       title: "Timer Resumed",
       description: "Work session resumed.",
     });
   };
 
-  const resetAll = () => {
+  const completeWorkday = () => {
+    // Mark current entry as completed
+    if (currentEntryId.current) {
+      const now = new Date();
+      const sessionTime = timer.currentSessionStart ? 
+        now.getTime() - timer.currentSessionStart.getTime() : 0;
+      const totalWorked = timer.totalWorkedMs + sessionTime;
+      
+      updateTimeEntry({ 
+        checkOut: now.toISOString(),
+        totalWorked,
+        status: 'completed'
+      });
+    }
+    
+    // Reset timer
     setTimer({
       isRunning: false,
       isPaused: false,
@@ -200,15 +351,54 @@ const WorkdayTracker = () => {
       currentSessionStart: null,
     });
     setIsSetupComplete(false);
+    currentEntryId.current = null;
+    
+    toast({
+      title: "Workday Complete!",
+      description: "Great job! Your session has been saved to history.",
+    });
+  };
+
+  const resetAll = () => {
+    // Complete current session if exists
+    if (currentEntryId.current) {
+      completeWorkday();
+    } else {
+      setTimer({
+        isRunning: false,
+        isPaused: false,
+        startTime: null,
+        totalWorkedMs: 0,
+        currentSessionStart: null,
+      });
+      setIsSetupComplete(false);
+      currentEntryId.current = null;
+    }
+    
     setArrivalTime({ hours: '', minutes: '' });
     setRequiredWorkTime({ hours: '8', minutes: '0' });
+    
     toast({
       title: "Reset Complete",
-      description: "All data cleared. You can start fresh.",
+      description: "You can start a fresh workday.",
     });
   };
 
   const stats = calculateCurrentStats();
+
+  // Update current entry in real-time
+  useEffect(() => {
+    if (timer.isRunning && currentEntryId.current && stats) {
+      updateTimeEntry({ 
+        totalWorked: stats.totalWorkedMs,
+        status: stats.isComplete ? 'completed' : 'active'
+      });
+    }
+  }, [stats?.totalWorkedMs, stats?.isComplete, timer.isRunning]);
+
+  if (!hasConsent) {
+    return <CookieConsent onAccept={() => setHasConsent(true)} />;
+  }
 
   if (!isSetupComplete) {
     return (
@@ -373,6 +563,33 @@ const WorkdayTracker = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Navigation */}
+        <Card className="shadow-lg">
+          <CardContent className="pt-6">
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={() => setShowHistory(!showHistory)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <History className="h-4 w-4" />
+                {showHistory ? 'Hide History' : 'Show History'}
+              </Button>
+              {stats?.isComplete && (
+                <Button
+                  onClick={completeWorkday}
+                  className="bg-gradient-to-r from-accent to-accent/80"
+                >
+                  Complete Workday
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* History Table */}
+        {showHistory && <TimeTable entries={timeEntries} />}
 
         {/* Stats Grid */}
         {stats && (
