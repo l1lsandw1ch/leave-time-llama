@@ -18,7 +18,9 @@ interface TimerState {
   isPaused: boolean;
   startTime: Date | null;
   totalWorkedMs: number;
+  totalPausedMs: number;
   currentSessionStart: Date | null;
+  pauseStartTime: Date | null;
 }
 
 const WorkdayTracker = () => {
@@ -33,7 +35,9 @@ const WorkdayTracker = () => {
     isPaused: false,
     startTime: null,
     totalWorkedMs: 0,
+    totalPausedMs: 0,
     currentSessionStart: null,
+    pauseStartTime: null,
   });
   
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -133,6 +137,7 @@ const WorkdayTracker = () => {
           checkIn: new Date().toISOString(),
           checkOut: null,
           totalWorked: 0,
+          totalPaused: 0,
           status: 'active',
           ...entryData
         };
@@ -232,7 +237,9 @@ const WorkdayTracker = () => {
       isPaused: false,
       startTime: arrivalToday,
       totalWorkedMs: alreadyWorkedMs,
+      totalPausedMs: 0,
       currentSessionStart: now,
+      pauseStartTime: null,
     });
     
     // Create time entry
@@ -242,6 +249,7 @@ const WorkdayTracker = () => {
       checkIn: arrivalToday.toISOString(),
       checkOut: null,
       totalWorked: alreadyWorkedMs,
+      totalPaused: 0,
       status: 'active'
     });
     
@@ -278,9 +286,10 @@ const WorkdayTracker = () => {
   };
 
   const pauseTimer = () => {
+    const now = new Date();
     setTimer(prev => {
       const sessionTime = prev.currentSessionStart ? 
-        currentTime.getTime() - prev.currentSessionStart.getTime() : 0;
+        now.getTime() - prev.currentSessionStart.getTime() : 0;
       
       const newTotalWorked = prev.totalWorkedMs + sessionTime;
       
@@ -298,6 +307,7 @@ const WorkdayTracker = () => {
         isPaused: true,
         totalWorkedMs: newTotalWorked,
         currentSessionStart: null,
+        pauseStartTime: now,
       };
     });
     toast({
@@ -308,12 +318,28 @@ const WorkdayTracker = () => {
 
   const resumeTimer = () => {
     const now = new Date();
-    setTimer(prev => ({
-      ...prev,
-      isRunning: true,
-      isPaused: false,
-      currentSessionStart: now,
-    }));
+    setTimer(prev => {
+      // Add pause time to total paused time
+      const pauseTime = prev.pauseStartTime ? 
+        now.getTime() - prev.pauseStartTime.getTime() : 0;
+      
+      // Update time entry with pause time
+      if (currentEntryId.current) {
+        updateTimeEntry({ 
+          totalPaused: prev.totalPausedMs + pauseTime,
+          status: 'active'
+        });
+      }
+      
+      return {
+        ...prev,
+        isRunning: true,
+        isPaused: false,
+        totalPausedMs: prev.totalPausedMs + pauseTime,
+        currentSessionStart: now,
+        pauseStartTime: null,
+      };
+    });
     
     // Update time entry status
     if (currentEntryId.current) {
@@ -347,7 +373,9 @@ const WorkdayTracker = () => {
       isPaused: false,
       startTime: null,
       totalWorkedMs: 0,
+      totalPausedMs: 0,
       currentSessionStart: null,
+      pauseStartTime: null,
     });
     setIsSetupComplete(false);
     currentEntryId.current = null;
@@ -368,7 +396,9 @@ const WorkdayTracker = () => {
         isPaused: false,
         startTime: null,
         totalWorkedMs: 0,
+        totalPausedMs: 0,
         currentSessionStart: null,
+        pauseStartTime: null,
       });
       setIsSetupComplete(false);
       currentEntryId.current = null;
@@ -380,6 +410,29 @@ const WorkdayTracker = () => {
     toast({
       title: "Reset Complete",
       description: "You can start a fresh workday.",
+    });
+  };
+
+  const renameEntry = (entryId: string, newName: string) => {
+    setTimeEntries(prev => 
+      prev.map(entry => 
+        entry.id === entryId 
+          ? { ...entry, name: newName }
+          : entry
+      )
+    );
+    toast({
+      title: "Entry Renamed",
+      description: "Work session name updated successfully.",
+    });
+  };
+
+  const deleteEntry = (entryId: string) => {
+    setTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
+    toast({
+      title: "Entry Deleted",
+      description: "Work session removed from history.",
+      variant: "destructive",
     });
   };
 
@@ -648,7 +701,11 @@ const WorkdayTracker = () => {
         )}
 
         {/* Work History */}
-        <TimeTable entries={timeEntries} />
+        <TimeTable 
+          entries={timeEntries} 
+          onRename={renameEntry}
+          onDelete={deleteEntry}
+        />
 
         {/* Status Indicator */}
         <Card className="shadow-lg">
