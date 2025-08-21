@@ -110,10 +110,36 @@ const WorkdayTracker = () => {
       });
       return;
     }
+
+    // Calculate time already worked since arrival
+    const now = new Date();
+    const arrivalToday = new Date();
+    arrivalToday.setHours(parseInt(arrivalTime.hours), parseInt(arrivalTime.minutes), 0, 0);
+    
+    // If arrival time is in the future (next day scenario), assume it was today
+    if (arrivalToday > now) {
+      arrivalToday.setDate(arrivalToday.getDate() - 1);
+    }
+    
+    const alreadyWorkedMs = Math.max(0, now.getTime() - arrivalToday.getTime());
+    
+    // Set up timer with already worked time and start it running
+    setTimer({
+      isRunning: true,
+      isPaused: false,
+      startTime: arrivalToday,
+      totalWorkedMs: alreadyWorkedMs,
+      currentSessionStart: now,
+    });
+    
     setIsSetupComplete(true);
+    
+    const alreadyWorkedHours = Math.floor(alreadyWorkedMs / (1000 * 60 * 60));
+    const alreadyWorkedMinutes = Math.floor((alreadyWorkedMs % (1000 * 60 * 60)) / (1000 * 60));
+    
     toast({
-      title: "Setup Complete!",
-      description: "You can now start your work timer.",
+      title: "Timer Started!",
+      description: `Already worked ${alreadyWorkedHours}h ${alreadyWorkedMinutes}m since arrival. Timer is now running.`,
     });
   };
 
