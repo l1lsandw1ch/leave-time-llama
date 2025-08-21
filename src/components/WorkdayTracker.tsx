@@ -112,35 +112,47 @@ const WorkdayTracker = () => {
     const arrivalMinutes = parseInt(sessionArrivalTime[1]);
     
     // Calculate arrival time for today
-    const arrivalMs = new Date().setHours(arrivalHours, arrivalMinutes, 0, 0);
+    const arrivalToday = new Date();
+    arrivalToday.setHours(arrivalHours, arrivalMinutes, 0, 0);
+    
+    // If arrival time is in the future (next day scenario), assume it was yesterday
+    const now = new Date();
+    if (arrivalToday > now) {
+      arrivalToday.setDate(arrivalToday.getDate() - 1);
+    }
+    
     const requiredMs = (currentSession.required_work_hours * 60 + currentSession.required_work_minutes) * 60 * 1000;
     
+    // Calculate total time that should have been worked since arrival
+    const timeSinceArrivalMs = now.getTime() - arrivalToday.getTime();
+    
+    // Get session totals
     let totalWorkedMs = timer.totalWorkedMs;
     let totalPausedMs = timer.totalPausedMs;
     
     // Add current session time if timer is running
     if (timer.isRunning && timer.currentSessionStart) {
-      totalWorkedMs += currentTime.getTime() - timer.currentSessionStart.getTime();
+      totalWorkedMs += now.getTime() - timer.currentSessionStart.getTime();
     }
     
     // Add current pause time if timer is paused (real-time update)
     if (timer.isPaused && timer.pauseStartTime) {
-      totalPausedMs += currentTime.getTime() - timer.pauseStartTime.getTime();
+      totalPausedMs += now.getTime() - timer.pauseStartTime.getTime();
     }
 
     const remainingMs = Math.max(0, requiredMs - totalWorkedMs);
     
-    // Calculate leave time based on arrival + required work + paused time
-    const baseLeaveTime = new Date(arrivalMs + requiredMs);
-    const adjustedLeaveTime = new Date(baseLeaveTime.getTime() + totalPausedMs);
+    // Calculate leave time: arrival + required work + total paused time
+    const leaveTime = new Date(arrivalToday.getTime() + requiredMs + totalPausedMs);
+    const originalLeaveTime = new Date(arrivalToday.getTime() + requiredMs);
 
     return {
       totalWorkedMs,
       totalPausedMs,
       remainingMs,
       requiredMs,
-      leaveTime: adjustedLeaveTime,
-      originalLeaveTime: baseLeaveTime,
+      leaveTime,
+      originalLeaveTime,
       progressPercentage: Math.min(100, (totalWorkedMs / requiredMs) * 100),
       isComplete: totalWorkedMs >= requiredMs
     };
@@ -207,10 +219,11 @@ const WorkdayTracker = () => {
       return;
     }
 
-    // Update session with already worked time
+    // Update session with already worked time and start timer immediately
     await updateSession({
       total_worked_ms: alreadyWorkedMs,
       current_session_start: now.toISOString(),
+      is_running: true,
     });
 
     // Create time entry with arrival time as check-in
@@ -229,7 +242,7 @@ const WorkdayTracker = () => {
     
     toast({
       title: "Timer Started!",
-      description: "Work session started. Timer is now running from this moment.",
+      description: "Work session started. Timer is now running and tracking from your arrival time.",
     });
   };
 
