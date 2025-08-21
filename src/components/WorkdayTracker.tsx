@@ -163,6 +163,10 @@ const WorkdayTracker = () => {
     let totalWorkedMs = timer.totalWorkedMs;
     let totalPausedMs = timer.totalPausedMs;
     
+    // Add manual pause time
+    const manualPauseMs = (parseInt(manualPauseTime.hours) * 60 + parseInt(manualPauseTime.minutes)) * 60 * 1000;
+    totalPausedMs += manualPauseMs;
+    
     // Add current session time if timer is running
     if (timer.isRunning && timer.currentSessionStart) {
       totalWorkedMs += currentTime.getTime() - timer.currentSessionStart.getTime();
@@ -174,12 +178,11 @@ const WorkdayTracker = () => {
     }
 
     const remainingMs = Math.max(0, requiredMs - totalWorkedMs);
-    const leaveTime = new Date(arrivalMs + requiredMs);
     
-    // If we still have time to work, calculate when we can leave based on current progress
+    // Calculate leave time including all paused time
     const adjustedLeaveTime = timer.isRunning ? 
       new Date(currentTime.getTime() + remainingMs) : 
-      new Date(arrivalMs + requiredMs);
+      new Date(arrivalMs + requiredMs + totalPausedMs);
 
     return {
       totalWorkedMs,
@@ -187,7 +190,7 @@ const WorkdayTracker = () => {
       remainingMs,
       requiredMs,
       leaveTime: adjustedLeaveTime,
-      originalLeaveTime: leaveTime,
+      originalLeaveTime: new Date(arrivalMs + requiredMs),
       progressPercentage: Math.min(100, (totalWorkedMs / requiredMs) * 100),
       isComplete: totalWorkedMs >= requiredMs
     };
