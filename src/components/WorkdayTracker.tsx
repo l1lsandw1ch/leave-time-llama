@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, History } from 'lucide-react';
+import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CookieConsent from './CookieConsent';
 import TimeTable, { TimeEntry } from './TimeTable';
@@ -23,7 +23,6 @@ interface TimerState {
 
 const WorkdayTracker = () => {
   const [hasConsent, setHasConsent] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [arrivalTime, setArrivalTime] = useState<TimeInput>({ hours: '', minutes: '' });
   const [requiredWorkTime, setRequiredWorkTime] = useState<TimeInput>({ hours: '8', minutes: '0' });
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -564,32 +563,21 @@ const WorkdayTracker = () => {
           </CardContent>
         </Card>
 
-        {/* Navigation */}
-        <Card className="shadow-lg">
-          <CardContent className="pt-6">
-            <div className="flex gap-4 justify-center">
-              <Button
-                onClick={() => setShowHistory(!showHistory)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <History className="h-4 w-4" />
-                {showHistory ? 'Hide History' : 'Show History'}
-              </Button>
-              {stats?.isComplete && (
+        {/* Complete Workday Button */}
+        {stats?.isComplete && (
+          <Card className="shadow-lg">
+            <CardContent className="pt-6">
+              <div className="flex justify-center">
                 <Button
                   onClick={completeWorkday}
                   className="bg-gradient-to-r from-accent to-accent/80"
                 >
                   Complete Workday
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* History Table */}
-        {showHistory && <TimeTable entries={timeEntries} />}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Grid */}
         {stats && (
@@ -658,6 +646,9 @@ const WorkdayTracker = () => {
             </Card>
           </div>
         )}
+
+        {/* Work History */}
+        <TimeTable entries={timeEntries} />
 
         {/* Status Indicator */}
         <Card className="shadow-lg">
