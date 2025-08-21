@@ -24,6 +24,7 @@ export const BurgerMenu = () => {
   };
 
   const displayName = profile?.display_name || 'User';
+  const avatarUrl = profile?.avatar_url;
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -39,7 +40,7 @@ export const BurgerMenu = () => {
           {/* Profile Section */}
           <div className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg">
             <Avatar className="h-16 w-16">
-              <AvatarImage src={profile?.avatar_url || ''} />
+              <AvatarImage src={avatarUrl || ''} />
               <AvatarFallback className="text-lg">
                 {getInitials(displayName)}
               </AvatarFallback>

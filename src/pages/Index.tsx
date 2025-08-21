@@ -28,12 +28,12 @@ const Index = () => {
     return null;
   }
 
-  const displayName = profile?.display_name || user.email?.split('@')[0] || 'there';
-
   return (
     <div>
       <div className="flex justify-between items-center p-4 border-b">
-        <h1 className="text-xl font-semibold">Welcome {displayName}!</h1>
+        <h1 className="text-xl font-semibold">
+          {profile?.display_name ? `Welcome ${profile.display_name}` : 'Workday Tracker'}
+        </h1>
         <BurgerMenu />
       </div>
       <WorkdayTracker />
