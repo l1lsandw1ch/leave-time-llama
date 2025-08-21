@@ -7,6 +7,7 @@ import { Clock, Play, Pause, RotateCcw, Timer, Target, AlertCircle, Plus } from 
 import { toast } from '@/hooks/use-toast';
 import CookieConsent from './CookieConsent';
 import TimeTable, { TimeEntry } from './TimeTable';
+import DailySummary from './DailySummary';
 
 interface TimeInput {
   hours: string;
@@ -798,6 +799,9 @@ const WorkdayTracker = () => {
             </Card>
           </div>
         )}
+
+        {/* Daily Summary */}
+        <DailySummary entries={timeEntries} />
 
         {/* Work History */}
         <TimeTable 
